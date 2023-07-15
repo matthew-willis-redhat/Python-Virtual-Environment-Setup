@@ -20,6 +20,7 @@ REQ_PACKAGES=(
 )
 
 # Define the Python packages to install with APT; add/edit/remove packages as necessary
+# If different versions of Python are necessary, add them to the list
 APT_PACKAGES=(
   python3.8
   python3.8-venv
@@ -28,6 +29,7 @@ APT_PACKAGES=(
 )
 
 # Define the Python packages to install with RPM; add/edit/remove packages as necessary
+# If different versions of Python are necessary, add them to the list
 RPM_PACKAGES=(
   python3.8
   python3.9
@@ -35,12 +37,13 @@ RPM_PACKAGES=(
 )
 
 # Define environment names; add/edit/remove the environment names
+# Any names that do not have a specific version will default to latest Python3 version
 PYTHON_ENVIRONMENTS=(
   py3.8
   py3.9
 )
 
-# Ansible package and versions; version install via 
+# Ansible package and versions; Ansible will be installed via pip
 ANSIBLE_PACKAGE=ansible
 ANSIBLE_PACKAGE_VER=">=2.9.0,<2.10.0"
 ANSIBLE_CORE_PACKAGE=ansible-core
@@ -160,6 +163,19 @@ for pyenv in "${PYTHON_ENVIRONMENTS[@]}"; do
       # Deactivate Python 3.9 environment
       deactivate
     fi
+  # If a specific version doesn't match, use python3
+  else
+    if [ ! -d "$HOME/venv/$pyenv" ]; then
+      echo -e "\n${INFO}Creating Python 3 venv:${RESET} $HOME/venv/$pyenv"
+      python3 -m venv "$pyenv"
+
+      source $HOME/venv/$pyenv/bin/activate
+      python -m pip install --upgrade pip
+      python -m pip install --upgrade setuptools
+
+      # Deactivate Python 3.9 environment
+      deactivate
+    fi 
   fi
 
   # Check for Python 3.8 environment
@@ -175,7 +191,7 @@ for pyenv in "${PYTHON_ENVIRONMENTS[@]}"; do
     fi
 
     # Print Ansible version details
-    ansible --version
+    #ansible --version
 
     # Deactivate Python 3.8 environment
     deactivate
@@ -192,11 +208,29 @@ for pyenv in "${PYTHON_ENVIRONMENTS[@]}"; do
     fi
 
     # Print Ansible version details
-    ansible --version
+    #ansible --version
 
     # Deactivate Python 3.9 environment
     deactivate
+  else
+    # Load Python 3 virtual environment
+    source $HOME/venv/$pyenv/bin/activate
+
+    ansible_pip_package=$(pip list | grep ${ANSIBLE_CORE_PACKAGE} | awk '{print $1}')
+
+    # Check if Ansible is installed
+    if [ -z $ansible_pip_package ]; then
+      pip install "${ANSIBLE_CORE_PACKAGE}"
+    fi
+
+    # Print Ansible version details
+    #ansible --version
+
+    # Deactivate Python 3.9 environment
+    deactivate
+
   fi
+
 done
 
 # Create aliases to activate and deactivate Python venv environments.
