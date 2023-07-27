@@ -1,6 +1,6 @@
 #!/bin/bash
 ##########################################################################################
-# Name:             python-virtualenv-setup.sh                                           #
+# Name:             setup.sh                                                             #
 # Description:      Create Python Virtual Environments with Ansible installation         #
 # Author:           Matt Willis                                                          #
 # Email:            mawillis@redhat.com                                                  #
