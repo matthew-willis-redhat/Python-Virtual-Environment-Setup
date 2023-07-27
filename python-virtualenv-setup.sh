@@ -95,9 +95,11 @@ function message {
 
 function usage {
   # Usage/Help function
-  message "  This script is meant to help with creating Python Virtual Environments for Ansible use."
   message ""
-  message "  Syntax: python-virtualenv-setup.sh [-a|d|e|h|n|r|p|v|V]"
+  message "  This script is meant to help create Python Virtual Environments for Ansible use."
+  message "  Installing Python 3 and creating Python Virtual Environment, to install Ansible within Python Virtual Environment."
+  message ""
+  message "  Syntax: python-virtualenv-setup.sh [-a|d|e|h|n|r|p|V]"
   message "" 
   message "  Options:"
   message "    -a     | --ansible               Ansible version to install"
@@ -280,6 +282,78 @@ function install_ansible {
   deactivate
 }
 
+function create_aliases {
+  # Create aliases to activate and deactivate Python venv environments.
+  # Create bashrc.d directory
+
+  message info "Checking if '$HOME/.bashrc.d' exists."
+  if [ ! -d "$HOME/.bashrc.d" ]; then
+    message info "'$HOME/.bashrc.d' directory is now being created."
+    mkdir "$HOME/.bashrc.d"
+    message success "'$HOME/.bashrc.d' directory created."
+  else
+    message success "'$HOME/.bashrc.d' directory already exists."
+  fi
+  
+  message info "Checking '$HOME/.bashrc' if '$HOME/.bashrc.d' directory is included."
+  # Update bashrc to read files from ~/.bashrc.d directory
+  if ! grep -q -e "bashrc.d" $HOME/.bashrc; then
+  message info "Updating '$HOME/.bashrc' to include '$HOME/.bashrc.d' directory files."
+    tee -a $HOME/.bashrc << END
+if [ -d ~/.bashrc.d ]; then
+  for rc in ~/.bashrc.d/*; do
+    if [ -f "$rc" ]; then
+      . "$rc"
+    fi
+  done
+fi
+
+unset rc
+END
+  fi
+
+  message info "Checking if '$HOME/.bashrc.d/venv' exists."
+  # Create alias file for Python virtual environments
+  # You may alter the contents of the file with any aliases
+  if [ ! -f "$HOME/.bashrc.d/venv" ]; then
+    message info "'$HOME/.bashrc.d/venv' files is now being created."
+    touch "$HOME/.bashrc.d/venv"
+    message success "'$HOME/.bashrc.d/venv' file created."
+  else
+    message success "'$HOME/.bashrc.d/venv' file already exists."
+  fi
+
+  message info "Checking if $ENVIRONMENT_NAME is added to the alias file."
+  if ! grep -q -e "$ENVIRONMENT_NAME" $HOME/.bashrc.d/venv; then
+    message info "Updating '$HOME/.bashrc.d/venv' to include '$ENVIRONMENT_NAME' aliases"
+    tee -a $HOME/.bashrc.d/venv << END
+alias $ENVIRONMENT_NAME-activate='source $VENV_DIRECTORY/$ENVIRONMENT_NAME/bin/activate'
+alias $ENVIRONMENT_NAME-deactivate='deactivate'
+END
+    message success "Added '$ENVIRONMENT_NAME' aliases to '$HOME/.bashrc.d/venv' file."
+  else
+    message success "'$ENVIRONMENT_NAME' aliases already exists in the '$HOME/.bashrc.d/venv' file."
+  fi
+
+  message info "Sourcing '~/.bashrc' file"
+  # Source the ~/.bashrc file
+  if [ -z $QUIET ]; then
+    source ~/.bashrc
+  else
+    source ~/.bashrc 2>&1 /dev/null
+  fi
+
+  # # Print alias commands
+  #echo -e "\n"
+
+  # for pyenv in "${PYTHON_VIRTUAL_ENVIRONMENTS[@]}"; do
+  #   echo -e "venv-$pyenv-activate
+  # venv-$pyenv-deactivate"
+  # done
+
+  # echo -e "\n${INFO}Use the alias commands listed above to activate or deactivate your virtual Python environment.${RESET}"
+}
+
 while [[ "$1" == -* ]]; do
   case "$1" in
     -h|--help)
@@ -335,8 +409,9 @@ install_python
 # $ENVIRONMENT_NAME - Default environment name for Python Virtual Environment
 create_python_virtual_environment
 
-
 # Install Ansible 2.X via PIP; this will include the ansible-core package
 # $ANSIBLE_VERSION - Default Ansible Version for installation
 install_ansible
-# create_aliases
+
+# Create Alias file for ease of use when activating and deactivating Python Virtual Environments
+#create_aliases
