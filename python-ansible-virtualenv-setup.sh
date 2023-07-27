@@ -196,6 +196,8 @@ function install_python {
       
       if [ $? -eq 0 ]; then
         message success "Python packages have been installed."
+        message info "Print Python version"
+        python --version
       else
         message warning "Check installation issues."
         exit
@@ -236,10 +238,8 @@ function create_python_virtual_environment {
 
       # Install required Python packages for Python Virtual Environment
       if [ -z $QUIET ]; then
-        message ""
         python -m pip install --upgrade pip
         python -m pip install --upgrade setuptools
-        message ""
       else
         python -m pip -q install --upgrade pip
         python -m pip -q install --upgrade setuptools
@@ -254,34 +254,38 @@ function create_python_virtual_environment {
 }
 
 function install_ansible {
-
+  
+  # Activate Python Virtual Environment prior to installing Ansible
   source $VENV_DIRECTORY/$ENVIRONMENT_NAME/bin/activate
 
+  # Get output of pip list
   ANSIBLE_PIP_PACKAGE=$(pip list | grep ${ANSIBLE_PACKAGE} | awk '{print $1}')
 
   # Check if Ansible is installed
   if [ -z $ANSIBLE_PIP_PACKAGE ]; then
+    message info "Installing ${ANSIBLE_PACKAGE}${ANSIBLE_VERSION}"
     if [ -z $QUIET ]; then
+      # Install Ansible package via PIP
       pip install "${ANSIBLE_PACKAGE}${ANSIBLE_VERSION}"
     else
+      # Quietly install Ansible package via PIP
       pip install -q "${ANSIBLE_PACKAGE}${ANSIBLE_VERSION}"
     fi
   fi
 
-  
-  message ""
   message success "Ansible has been successfully installed"
 
   if [ -z $QUIET ]; then 
     # Print Ansible version details
+    message info "Print Ansible Version"
     ansible --version
   fi
 
-  message ""
-  # Deactivate Python 3.8 environment
+  # Deactivate Python Virtual Environment
   deactivate
 }
 
+# Get script arguments prior to executing script
 while [[ "$1" == -* ]]; do
   case "$1" in
     -h|--help)
@@ -340,3 +344,5 @@ create_python_virtual_environment
 # Install Ansible 2.X via PIP; this will include the ansible-core package
 # $ANSIBLE_VERSION - Default Ansible Version for installation
 install_ansible
+
+message success "Script completed"
