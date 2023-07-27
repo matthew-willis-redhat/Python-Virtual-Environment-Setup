@@ -15,6 +15,7 @@
 ##########################################################################################
 
 # Default Ansible Version; Ansible will be installed using 'pip' - https://pypi.org/project/ansible/
+ANSIBLE_PACKAGE=ansible
 ANSIBLE_VERSION=">=8.0.0"
 
 # Default environment name for Python Virtual Environment
@@ -28,6 +29,8 @@ PYTHON_VERSION="3"
 
 # Python package name; DO NOT EDIT this variable unless necessary
 PYTHON_PACKAGE="python$PYTHON_VERSION"
+
+RPM_PYTHON_VENV_PACKAGE="python3-virtualenv"
 
 # This is the base directory to store Python Virtual Environments
 #
@@ -104,7 +107,6 @@ function usage {
   message "    -r     | --root, --directory     Root directory for Python Virtual Environments"
   message "    -q     | --quiet                 Suppress script message output"
   message "    -p     | --python                Python version to install"
-  message "    -v     | --verbose               Add verbosity to the script"
   message "    -V     | --version               Display version of script"
   message ""
 }
@@ -112,7 +114,7 @@ function usage {
 function defaults {
   message info "Python Version: $PYTHON_VERSION"
   message info "Python Package: $PYTHON_PACKAGE"
-  message info "Ansible Version: $ANSIBLE_VERSION"
+  message info "Ansible Version: $ANSIBLE_PACKAGE$ANSIBLE_VERSION"
   message info "Environment Name: $ENVIRONMENT_NAME"
   message info "Virtual Environment Directory: $VENV_DIRECTORY/$ENVIRONMENT_NAME"
 }
@@ -121,20 +123,25 @@ function install_python {
   
   function version_check {
 
-    # if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
-    #   # Create python_package_check var
-    #   python_package_check=$(dpkg-query -Wf'${db:Status-abbrev}' $python_ver 2>/dev/null | grep -q '^i'; then)
+    if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
+      message warning "APT based Operating Systems not yet supported"
+      return 1
+    fi
 
-    #   if [ ! -z $python_package_check ]; then
+    # if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
+    #   # Create PYTHON_PACKAGE_CHECK var
+    #   PYTHON_PACKAGE_CHECK=$(dpkg-query -Wf'${db:Status-abbrev}' $python_ver 2>/dev/null | grep -q '^i'; then)
+
+    #   if [ ! -z $PYTHON_PACKAGE_CHECK ]; then
     #     echo -e "${SUCCESS}Python package '$python_ver' is already installed.${RESET}"
     #     return 
     #   else
     #     echo "Python package '$python_ver' is not installed on this operating system."
 
     #     echo "Checking if Python package '$python_ver' is available to install."
-    #     python_package_install=$(apt search . | cut -f 1 -d "/" | grep -e "^${python_ver}$")
+    #     PYTHON_PACKAGE_INSTALL=$(apt search . | cut -f 1 -d "/" | grep -e "^${python_ver}$")
 
-    #     if [ ! -z "$python_package_install" ]; then
+    #     if [ ! -z "$PYTHON_PACKAGE_INSTALL" ]; then
     #       echo -e "${SUCCESS}Python package '$python_ver' is available to install on this operating system.\n ${RESET}"
     #       return 0
     #     else
@@ -146,33 +153,59 @@ function install_python {
 
     # Check if package manager is RPM
     if [[ $PACKAGE_MANAGER = *yum* ]] || [[ $PACKAGE_MANAGER = *dnf* ]]; then
-      # Create python_package_check var
-      python_package_check=$(rpm -qa ${python_pkg})
+      # Create PYTHON_PACKAGE_CHECK var
+      PYTHON_PACKAGE_CHECK=$(rpm -qa ${PYTHON_PACKAGE})
+
+      if [ ! -z $PYTHON_PACKAGE_CHECK ]; then
+        message success "Python package '$PYTHON_PACKAGE' is already installed."
+        return 
+      else
+        message "Python package '$PYTHON_PACKAGE' is not installed on this operating system."
+
+        message "Checking if Python package '$PYTHON_PACKAGE' is available to install."
+        PYTHON_PACKAGE_INSTALL=$(yum list -q | grep $PYTHON_PACKAGE)
+
+        if [ ! -z "$PYTHON_PACKAGE_INSTALL" ]; then
+          message info "Python package '$PYTHON_PACKAGE' is available to install on this operating system."
+          message ""
+          return 0
+        else
+          message error "Python package '$PYTHON_PACKAGE' is not available to install on this operating system."
+          message "Learn more about the Python releases: https://devguide.python.org/versions/"
+          return 1
+        fi
+      fi
     fi
-
-    # if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
-
-    # fi
-
-    # if [ ! -z $python_package_check ]; then
-    #   echo -e "${SUCCESS}Python package '$python_ver' is already installed.${RESET}"
-    #   return 
-    # else
-    #   echo "Python package '$python_ver' is not installed on this operating system."
-
-    #   echo "Checking if Python package '$python_ver' is available to install."
-    #   python_package_install=$(yum list -q | grep $python_ver)
-
-    #   if [ ! -z "$python_package_install" ]; then
-    #     echo -e "${SUCCESS}Python package '$python_ver' is available to install on this operating system.\n ${RESET}"
-    #     return 0
-    #   else
-    #     echo -e "${ERROR}Python package '$python_ver' is not available for install on this operating system. Please make another selection.\n ${RESET}"
-    #     return 1
-    #   fi
-    # fi
   }
+
+  # Check if the Python version is installed and/or available to be installed
   version_check
+
+  if [ $? -eq 0 ]; then       
+    if [[ $PACKAGE_MANAGER = *yum* ]] || [[ $PACKAGE_MANAGER = *dnf* ]]; then
+
+      if [ -z $QUIET ]; then
+        # Install Python and Virtual Environment RPM packages
+        message info "Installing '$PYTHON_PACKAGE' and '$RPM_PYTHON_VENV_PACKAGE'." 
+        sudo yum install $PYTHON_PACKAGE $RPM_PYTHON_VENV_PACKAGE -y
+      else
+        sudo yum install $PYTHON_PACKAGE $RPM_PYTHON_VENV_PACKAGE -y -q
+      fi
+      
+      if [ $? -eq 0 ]; then
+        message success "Python packages have been installed."
+      else
+        message warning "Check installation issues."
+        exit
+      fi
+      # Clear sudo privileges
+      sudo -k
+      
+    fi
+  else
+    # Exit script because Python version entered is not available
+    exit
+  fi
 }
 
 function create_python_virtual_environment {
@@ -205,6 +238,9 @@ function create_python_virtual_environment {
         python -m pip install --upgrade pip
         python -m pip install --upgrade setuptools
         message ""
+      else
+        python -m pip -q install --upgrade pip
+        python -m pip -q install --upgrade setuptools
       fi
 
       # Deactivate Python Virtual Environment
@@ -215,9 +251,34 @@ function create_python_virtual_environment {
   fi
 }
 
-# function install_ansible {
+function install_ansible {
 
-# }
+  source $VENV_DIRECTORY/$ENVIRONMENT_NAME/bin/activate
+
+  ANSIBLE_PIP_PACKAGE=$(pip list | grep ${ANSIBLE_PACKAGE} | awk '{print $1}')
+
+  # Check if Ansible is installed
+  if [ -z $ANSIBLE_PIP_PACKAGE ]; then
+    if [ -z $QUIET ]; then
+      pip install "${ANSIBLE_PACKAGE}${ANSIBLE_VERSION}"
+    else
+      pip install -q "${ANSIBLE_PACKAGE}${ANSIBLE_VERSION}"
+    fi
+  fi
+
+  
+  message ""
+  message success "Ansible has been successfully installed"
+
+  if [ -z $QUIET ]; then 
+    # Print Ansible version details
+    ansible --version
+  fi
+
+  message ""
+  # Deactivate Python 3.8 environment
+  deactivate
+}
 
 while [[ "$1" == -* ]]; do
   case "$1" in
@@ -232,6 +293,7 @@ while [[ "$1" == -* ]]; do
     -d|--defaults)
       shift
       defaults
+      exit 0
       ;;
     -e|-n|--environment|--name)
       shift
@@ -264,14 +326,17 @@ done
 ##########################################################################################
 
 # Install Python3.x
-# $PYTHON_VERSION - Default Python Version
-# $PYTHON_PACKAGE - Python package name
-# install_python
+# $PYTHON_VERSION - Default Python Version for installation
+# $PYTHON_PACKAGE - Python package name for installation
+install_python
 
 # Create Python Virtual Environment
 # $VENV_DIRECTORY - Python Virtual Environment directory
 # $ENVIRONMENT_NAME - Default environment name for Python Virtual Environment
 create_python_virtual_environment
 
-# install_ansible
+
+# Install Ansible 2.X via PIP; this will include the ansible-core package
+# $ANSIBLE_VERSION - Default Ansible Version for installation
+install_ansible
 # create_aliases
