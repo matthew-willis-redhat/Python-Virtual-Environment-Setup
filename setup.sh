@@ -29,7 +29,7 @@ PYTHON_VERSION="3"
 
 # Python package name; DO NOT EDIT this variable unless necessary
 PYTHON_PACKAGE="python$PYTHON_VERSION"
-
+APT_PYTHON_VENV_PACKAGE="$PYTHON_PACKAGE-venv"
 RPM_PYTHON_VENV_PACKAGE="python3-virtualenv"
 
 # This is the base directory to store Python Virtual Environments
@@ -126,8 +126,27 @@ function install_python {
   function version_check {
 
     if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
-      message warning "APT based Operating Systems not yet supported"
-      return 1
+      # Create PYTHON_PACKAGE_CHECK var
+      PYTHON_PACKAGE_CHECK=$(dpkg-query -Wf'${db:Status-abbrev}' $PYTHON_PACKAGE 2>/dev/null | grep 'i')
+
+      if [ ! -z $PYTHON_PACKAGE_CHECK ]; then
+        message success "Python package '$PYTHON_PACKAGE' is already installed."
+        return
+      else 
+        message info "Python package '$PYTHON_PACKAGE' is not installed on this operating system."
+
+        message info "Checking if Python package '$PYTHON_PACKAGE' is available to install."
+        PYTHON_PACKAGE_INSTALL=$(apt search . 2>/dev/null | cut -f 1 -d "/" | grep -e "^${PYTHON_PACKAGE}$")
+
+        if [ ! -z "$PYTHON_PACKAGE_INSTALL" ]; then
+          message info "Python package '$PYTHON_PACKAGE' is available to install on this operating system."
+          return 0
+        else
+          message error "Python package '$PYTHON_PACKAGE' is not available to install on this operating system."
+          message "Learn more about the Python releases: https://devguide.python.org/versions/"
+          return 1
+        fi
+      fi      
     fi
 
     # if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
@@ -169,7 +188,6 @@ function install_python {
 
         if [ ! -z "$PYTHON_PACKAGE_INSTALL" ]; then
           message info "Python package '$PYTHON_PACKAGE' is available to install on this operating system."
-          message ""
           return 0
         else
           message error "Python package '$PYTHON_PACKAGE' is not available to install on this operating system."
@@ -183,29 +201,44 @@ function install_python {
   # Check if the Python version is installed and/or available to be installed
   version_check
 
-  if [ $? -eq 0 ]; then       
+  if [ $? -eq 0 ]; then
+    if [[ $PACKAGE_MANAGER = *apt-get* ]]; then
+      # Run APT update
+      message info "Running APT Update"
+      sudo apt-get update
+
+      if [ -z $QUIET ]; then
+        # Install Python and Virtual Environment RPM packages
+        message info "Installing '$PYTHON_PACKAGE', '$PYTHON_PACKAGE-pip', and '$APT_PYTHON_VENV_PACKAGE'." 
+        sudo apt-get install $PYTHON_PACKAGE python3-pip $APT_PYTHON_VENV_PACKAGE -y
+      else
+        sudo apt-get install $PYTHON_PACKAGE python3-pip $APT_PYTHON_VENV_PACKAGE -y -qq
+      fi
+    fi
+
     if [[ $PACKAGE_MANAGER = *yum* ]] || [[ $PACKAGE_MANAGER = *dnf* ]]; then
 
       if [ -z $QUIET ]; then
         # Install Python and Virtual Environment RPM packages
-        message info "Installing '$PYTHON_PACKAGE' and '$RPM_PYTHON_VENV_PACKAGE'." 
-        sudo yum install $PYTHON_PACKAGE $RPM_PYTHON_VENV_PACKAGE -y
+        message info "Installing '$PYTHON_PACKAGE', '$PYTHON_PACKAGE-pip' and '$RPM_PYTHON_VENV_PACKAGE'." 
+        sudo yum install $PYTHON_PACKAGE $PYTHON_PACKAGE-pip $RPM_PYTHON_VENV_PACKAGE -y
       else
-        sudo yum install $PYTHON_PACKAGE $RPM_PYTHON_VENV_PACKAGE -y -q
+        sudo yum install $PYTHON_PACKAGE $PYTHON_PACKAGE-pip $RPM_PYTHON_VENV_PACKAGE -y -q
       fi
+    fi
+
+    if [ $? -eq 0 ]; then
+      message success "Python packages have been installed."
+      message info "Print Python version"
+      python3 --version
       
-      if [ $? -eq 0 ]; then
-        message success "Python packages have been installed."
-        message info "Print Python version"
-        python --version
-      else
-        message warning "Check installation issues."
-        exit
-      fi
       # Clear sudo privileges
       sudo -k
+    else
+      message warning "Check installation issues."
+      exit
+    fi 
       
-    fi
   else
     # Exit script because Python version entered is not available
     exit
