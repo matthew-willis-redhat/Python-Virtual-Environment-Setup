@@ -189,9 +189,9 @@ function install_python {
       if [ -z $QUIET ]; then
         # Install Python and Virtual Environment RPM packages
         message info "Installing '$PYTHON_PACKAGE' and '$RPM_PYTHON_VENV_PACKAGE'." 
-        sudo yum install $PYTHON_PACKAGE $RPM_PYTHON_VENV_PACKAGE -y
+        sudo yum install $PYTHON_PACKAGE $PYTHON_PACKAGE-pip $RPM_PYTHON_VENV_PACKAGE -y
       else
-        sudo yum install $PYTHON_PACKAGE $RPM_PYTHON_VENV_PACKAGE -y -q
+        sudo yum install $PYTHON_PACKAGE $PYTHON_PACKAGE-pip $RPM_PYTHON_VENV_PACKAGE -y -q
       fi
       
       if [ $? -eq 0 ]; then
