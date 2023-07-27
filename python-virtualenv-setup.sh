@@ -1,4 +1,11 @@
 #!/bin/bash
+##########################################################################################
+# Name:             python-virtualenv-setup.sh                                           #
+# Description:      Create Python Virtual Environments with Ansible installation         #
+# Author:           Matt Willis                                                          #
+# Email:            mawillis@redhat.com                                                  #
+# Version:          1.0.0                                                                #
+##########################################################################################
 
 ##########################################################################################
 #                                   Global Variables                                     #
@@ -27,6 +34,9 @@ PYTHON_PACKAGE="python$PYTHON_VERSION"
 # Example: $VENV_DIRECTORY/$ENVIRONMENT_NAME
 #          /home/user/venv/python3-venv
 VENV_DIRECTORY="$HOME/venv"
+
+# Script version
+VERSION="1.0.0"
 
 ##########################################################################################
 #                                     FUNCTIONS                                          #
@@ -61,20 +71,23 @@ function message {
   }
 
   # Convert arguement to lowercase; set variable
-  message_status=$(echo "$1" | awk '{print tolower($0)}')
+  MESSAGE_STATUS=$(echo "$1" | awk '{print tolower($0)}')
 
-  # Execute message based on status
-  if [ "$message_status" = "error" ]; then
-    message_error "$2"
-  elif [ "$message_status" = "info" ]; then
-    message_info "$2"
-  elif [ "$message_status" = "success" ]; then
-    message_success "$2"
-  elif [ "$message_status" = "warning" ]; then
-    message_warning "$2"
-  else
-    echo "$1"
+  if [ -z $QUIET ]; then
+    # Execute message based on status
+    if [ "$MESSAGE_STATUS" = "error" ]; then
+      message_error "$2"
+    elif [ "$MESSAGE_STATUS" = "info" ]; then
+      message_info "$2"
+    elif [ "$MESSAGE_STATUS" = "success" ]; then
+      message_success "$2"
+    elif [ "$MESSAGE_STATUS" = "warning" ]; then
+      message_warning "$2"
+    else
+      echo "$1"
+    fi
   fi
+
 }
 
 function usage {
@@ -84,11 +97,12 @@ function usage {
   message "  Syntax: python-virtualenv-setup.sh [-a|d|e|h|n|r|p|v|V]"
   message "" 
   message "  Options:"
-  message "    -a     | --ansible               Ansible-Core version to install"
+  message "    -a     | --ansible               Ansible version to install"
   message "    -d     | --defaults              Display default settings"
   message "    -e, -n | --environment, --name   Python Virtual Environment name to be created"
   message "    -h     | --help                  Show help"
   message "    -r     | --root, --directory     Root directory for Python Virtual Environments"
+  message "    -q     | --quiet                 Suppress script message output"
   message "    -p     | --python                Python version to install"
   message "    -v     | --verbose               Add verbosity to the script"
   message "    -V     | --version               Display version of script"
@@ -163,25 +177,41 @@ function install_python {
 
 function create_python_virtual_environment {
   
+  message info "Checking if '$VENV_DIRECTORY' exists."
+
   # Create root directory of Python Virtual Environments
   if [ ! -d "$VENV_DIRECTORY" ]; then
     message info "'$VENV_DIRECTORY' directory is now being created."
     mkdir $VENV_DIRECTORY
+    message success "'$VENV_DIRECTORY' directory created."
+  else
+    message success "'$VENV_DIRECTORY' directory already exists."
   fi
 
   # Install pip and upgrade in each Python venv environments
   cd $VENV_DIRECTORY
 
+  message info "Checking if '$VENV_DIRECTORY/$ENVIRONMENT_NAME' Python Virtual Environment exists."
   if [ ! -d "$VENV_DIRECTORY/$ENVIRONMENT_NAME" ]; then
       message info "Creating Python Virtual Environment: $VENV_DIRECTORY/$ENVIRONMENT_NAME"
       ${PYTHON_PACKAGE} -m venv "$ENVIRONMENT_NAME"
 
+      # Activate Python Virtual Environment
       source $VENV_DIRECTORY/$ENVIRONMENT_NAME/bin/activate
-      python -m pip install --upgrade pip
-      python -m pip install --upgrade setuptools
+
+      # Install required Python packages for Python Virtual Environment
+      if [ -z $QUIET ]; then
+        message ""
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade setuptools
+        message ""
+      fi
 
       # Deactivate Python Virtual Environment
       deactivate
+      message success "'$VENV_DIRECTORY/$ENVIRONMENT_NAME' Python Virtual Environment created."
+  else
+    message success "'$VENV_DIRECTORY/$ENVIRONMENT_NAME' Python Virtual Environment already exists."
   fi
 }
 
@@ -212,16 +242,36 @@ while [[ "$1" == -* ]]; do
       PYTHON_VERSION=${1:-"$PYTHON_VERSION"}
       PYTHON_PACKAGE="python${PYTHON_VERSION}"      
       ;;
+    -q|--quiet)
+      QUIET="true"
+      ;;
     -r|--root|--directory)
       shift
       VENV_DIRECTORY=${1:-"$VENV_DIRECTORY"}
+      ;;
+    -V|--version)
+      message "Version: $VERSION"
+      exit 0
       ;;
   esac
   shift
 done
 
+##########################################################################################
+#                                       Main                                             #
+#                                                                                        # 
+#    This section is main portion of the script, that calls the functions to execute.    #
+##########################################################################################
 
+# Install Python3.x
+# $PYTHON_VERSION - Default Python Version
+# $PYTHON_PACKAGE - Python package name
 # install_python
-# create_python_virtual_environment
+
+# Create Python Virtual Environment
+# $VENV_DIRECTORY - Python Virtual Environment directory
+# $ENVIRONMENT_NAME - Default environment name for Python Virtual Environment
+create_python_virtual_environment
+
 # install_ansible
 # create_aliases
